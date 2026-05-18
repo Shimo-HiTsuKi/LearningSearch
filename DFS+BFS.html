@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Pathfinding Visualizer</title>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; background-color: #f8f9fa; }
+        .controls { margin: 20px; }
+        button { padding: 10px 15px; margin: 0 5px; cursor: pointer; font-size: 16px; }
+        
+        /* Grid Styling */
+        #grid { display: grid; gap: 1px; background-color: #bdc3c7; border: 2px solid #7f8c8d; }
+        .cell { width: 30px; height: 30px; background-color: white; cursor: pointer; transition: background-color 0.1s ease-in-out; }
+        
+        /* Node States */
+        .wall { background-color: #34495e; }
+        .start { background-color: #2ecc71; }
+        .target { background-color: #e74c3c; }
+        .visited { background-color: #3498db; }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <button onclick="runBFS()">Run BFS (Queue)</button>
+        <button onclick="runDFS()">Run DFS (Stack)</button>
+        <button onclick="clearGrid()">Clear Grid</button>
+    </div>
+
+    <div id="grid"></div>
+
+    <script>
+        const rows = 15;
+        const cols = 20;
+        const gridElement = document.getElementById('grid');
+        gridElement.style.gridTemplateColumns = `repeat(${cols}, 30px)`;
+        
+        let grid = [];
+        let startNode = { r: 7, c: 3 };
+        let targetNode = { r: 7, c: 16 };
+
+        // 1. Generate the Grid
+        function createGrid() {
+            gridElement.innerHTML = '';
+            grid = [];
+            for (let r = 0; r < rows; r++) {
+                let row = [];
+                for (let c = 0; c < cols; c++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    
+                    // Mark Start and Target
+                    if (r === startNode.r && c === startNode.c) cell.classList.add('start');
+                    else if (r === targetNode.r && c === targetNode.c) cell.classList.add('target');
+                    
+                    // Click to draw walls
+                    cell.addEventListener('mousedown', () => toggleWall(r, c, cell));
+                    
+                    gridElement.appendChild(cell);
+                    row.push({ r, c, isWall: false, element: cell });
+                }
+                grid.push(row);
+            }
+        }
+
+        function toggleWall(r, c, cell) {
+            if ((r === startNode.r && c === startNode.c) || (r === targetNode.r && c === targetNode.c)) return;
+            grid[r][c].isWall = !grid[r][c].isWall;
+            cell.classList.toggle('wall');
+        }
+
+        function clearGrid() {
+            createGrid();
+        }
+
+        // 2. Helper Functions
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms)); // Creates the animation effect
+
+        function getNeighbors(node) {
+            const { r, c } = node;
+            const neighbors = [];
+            if (r > 0) neighbors.push(grid[r - 1][c]);       // Up
+            if (c < cols - 1) neighbors.push(grid[r][c + 1]); // Right
+            if (r < rows - 1) neighbors.push(grid[r + 1][c]); // Down
+            if (c > 0) neighbors.push(grid[r][c - 1]);       // Left
+            return neighbors.filter(n => !n.isWall);
+        }
+
+        // 3. Breadth-First Search (Uses a Queue)
+        async function runBFS() {
+            let queue = [grid[startNode.r][startNode.c]];
+            let visited = new Set([`${startNode.r},${startNode.c}`]);
+            
+            while (queue.length > 0) {
+                let current = queue.shift(); // Dequeue from front
+                
+                if (current.r === targetNode.r && current.c === targetNode.c) {
+                    return; // Target found
+                }
+
+                if (current !== grid[startNode.r][startNode.c]) {
+                    current.element.classList.add('visited');
+                    await sleep(20); 
+                }
+
+                for (let neighbor of getNeighbors(current)) {
+                    let key = `${neighbor.r},${neighbor.c}`;
+                    if (!visited.has(key)) {
+                        visited.add(key);
+                        queue.push(neighbor); // Enqueue to back
+                    }
+                }
+            }
+        }
+
+        // 4. Depth-First Search (Uses a Stack)
+        async function runDFS() {
+            let stack = [grid[startNode.r][startNode.c]];
+            let visited = new Set();
+            
+            while (stack.length > 0) {
+                let current = stack.pop(); // Pop from back
+                let key = `${current.r},${current.c}`;
+                
+                if (!visited.has(key)) {
+                    visited.add(key);
+                    
+                    if (current.r === targetNode.r && current.c === targetNode.c) {
+                        return; // Target found
+                    }
+
+                    if (current !== grid[startNode.r][startNode.c]) {
+                        current.element.classList.add('visited');
+                        await sleep(40); 
+                    }
+
+                    let neighbors = getNeighbors(current);
+                    for (let i = neighbors.length - 1; i >= 0; i--) {
+                        stack.push(neighbors[i]); // Push to back
+                    }
+                }
+            }
+        }
+
+        // Initialize on load
+        createGrid();
+    </script>
+</body>
+</html>
