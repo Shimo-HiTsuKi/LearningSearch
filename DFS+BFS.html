@@ -18,8 +18,26 @@
 
         .header { text-align: center; margin-bottom: 20px; }
         
-        .controls { margin-bottom: 20px; display: flex; gap: 10px; }
-        
+        .toolbar {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            background: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .brush-controls, .action-controls { 
+            display: flex; 
+            align-items: center;
+            gap: 10px; 
+        }
+
+        .brush-label { font-weight: bold; color: #2c3e50; margin-right: 5px;}
+
         button { 
             padding: 10px 20px; 
             border: none; 
@@ -27,12 +45,20 @@
             background-color: #2c3e50; 
             color: white; 
             cursor: pointer; 
-            font-size: 16px; 
+            font-size: 14px; 
             font-weight: bold;
-            transition: background-color 0.2s;
+            transition: all 0.2s;
         }
+        
         button:hover { background-color: #1a252f; }
         button:disabled { background-color: #95a5a6; cursor: not-allowed; }
+
+        /* Highlight the currently selected brush */
+        .active-brush {
+            background-color: #3498db;
+            box-shadow: 0 0 0 2px white, 0 0 0 4px #3498db;
+        }
+        .active-brush:hover { background-color: #2980b9; }
 
         /* Grid Configuration */
         #grid { 
@@ -47,8 +73,7 @@
             width: 25px; 
             height: 25px; 
             background-color: white; 
-            cursor: pointer; 
-            /* Subtle transition for standard state changes */
+            cursor: crosshair; 
             transition: background-color 0.1s ease-out; 
         }
 
@@ -85,14 +110,22 @@
 
     <div class="header">
         <h2>Intelligent Agent Pathfinding</h2>
-        <p>Click and drag to draw walls. Green is Start, Red is Target.</p>
+        <p>Select a brush to draw or erase walls. Green is Start, Red is Target.</p>
     </div>
 
-    <!-- HTML Updates: Added IDs to buttons so we can disable them during animation -->
-    <div class="controls">
-        <button id="btn-bfs" onclick="runAlgorithm('bfs')">Run BFS (Shortest Path)</button>
-        <button id="btn-dfs" onclick="runAlgorithm('dfs')">Run DFS (Deep Path)</button>
-        <button id="btn-clear" onclick="clearGrid()">Clear Board</button>
+    <div class="toolbar">
+        <div class="brush-controls">
+            <span class="brush-label">Brush:</span>
+            <button id="btn-wall" class="active-brush" onclick="setBrush('wall')">Wall</button>
+            <button id="btn-eraser" onclick="setBrush('eraser')">Eraser</button>
+        </div>
+        
+        <div class="action-controls">
+            <button id="btn-bfs" onclick="runAlgorithm('bfs')">Run BFS</button>
+            <button id="btn-dfs" onclick="runAlgorithm('dfs')">Run DFS</button>
+            <button id="btn-clear-search" onclick="clearSearch()">Clear Search</button>
+            <button id="btn-clear-grid" onclick="clearGrid()">Reset Grid</button>
+        </div>
     </div>
 
     <div id="grid"></div>
@@ -108,9 +141,17 @@
         let startNode = { r: 10, c: 5 };
         let targetNode = { r: 10, c: 34 };
         
-        // System variables for dragging and locking
+        // System variables
         let isMousePressed = false;
         let isAlgorithmRunning = false;
+        let currentBrush = 'wall'; // 'wall' or 'eraser'
+
+        // Handle Brush Selection
+        function setBrush(type) {
+            currentBrush = type;
+            document.getElementById('btn-wall').classList.toggle('active-brush', type === 'wall');
+            document.getElementById('btn-eraser').classList.toggle('active-brush', type === 'eraser');
+        }
 
         function createGrid() {
             gridElement.innerHTML = '';
@@ -124,16 +165,16 @@
                     if (r === startNode.r && c === startNode.c) cell.classList.add('start');
                     else if (r === targetNode.r && c === targetNode.c) cell.classList.add('target');
                     
-                    // Upgraded Mouse Events for "Drag to Draw"
+                    // Updated Mouse Events using the new draw logic
                     cell.addEventListener('mousedown', () => {
                         if (isAlgorithmRunning) return;
                         isMousePressed = true;
-                        toggleWall(r, c, cell);
+                        applyBrush(r, c, cell);
                     });
                     
                     cell.addEventListener('mouseenter', () => {
                         if (isAlgorithmRunning || !isMousePressed) return;
-                        toggleWall(r, c, cell);
+                        applyBrush(r, c, cell);
                     });
                     
                     cell.addEventListener('mouseup', () => isMousePressed = false);
@@ -145,32 +186,43 @@
             }
         }
         
-        // Stop drawing if mouse leaves the whole grid area
         gridElement.addEventListener('mouseleave', () => isMousePressed = false);
 
-        function toggleWall(r, c, cell) {
+        // Apply either wall or eraser based on current selection
+        function applyBrush(r, c, cell) {
             if ((r === startNode.r && c === startNode.c) || (r === targetNode.r && c === targetNode.c)) return;
             
-            grid[r][c].isWall = !grid[r][c].isWall;
-            if (grid[r][c].isWall) {
+            if (currentBrush === 'wall') {
+                grid[r][c].isWall = true;
                 cell.classList.add('wall');
-            } else {
+            } else if (currentBrush === 'eraser') {
+                grid[r][c].isWall = false;
                 cell.classList.remove('wall');
             }
         }
 
+        // Clears only the blue visited nodes and yellow path nodes
+        function clearSearch() {
+            if (isAlgorithmRunning) return;
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    grid[r][c].previousNode = null;
+                    grid[r][c].element.classList.remove('visited', 'path');
+                }
+            }
+        }
+
+        // Hard reset of everything
         function clearGrid() {
             if (isAlgorithmRunning) return;
             createGrid();
         }
 
-        // Helper: Animation delay
         const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
         function getNeighbors(node) {
             const { r, c } = node;
             const neighbors = [];
-            // Order matters for visual feel. Usually: Up, Right, Down, Left
             if (r > 0) neighbors.push(grid[r - 1][c]);       
             if (c < cols - 1) neighbors.push(grid[r][c + 1]); 
             if (r < rows - 1) neighbors.push(grid[r + 1][c]); 
@@ -182,23 +234,18 @@
         
         async function runAlgorithm(type) {
             if (isAlgorithmRunning) return;
+            
+            // Automatically clear the previous search visual before starting a new one
+            clearSearch(); 
+
             isAlgorithmRunning = true;
             toggleButtons(true);
-
-            // Clean up previous runs but keep walls
-            for (let r = 0; r < rows; r++) {
-                for (let c = 0; c < cols; c++) {
-                    grid[r][c].previousNode = null;
-                    grid[r][c].element.classList.remove('visited', 'path');
-                }
-            }
 
             let dataStructure = [grid[startNode.r][startNode.c]];
             let visited = new Set([`${startNode.r},${startNode.c}`]);
             let found = false;
             
             while (dataStructure.length > 0) {
-                // BFS uses shift() [Queue], DFS uses pop() [Stack]
                 let current = type === 'bfs' ? dataStructure.shift() : dataStructure.pop(); 
                 
                 if (current.r === targetNode.r && current.c === targetNode.c) {
@@ -208,7 +255,7 @@
 
                 if (current.r !== startNode.r || current.c !== startNode.c) {
                     current.element.classList.add('visited');
-                    await sleep(10); // Speed of search animation
+                    await sleep(10); 
                 }
 
                 let neighbors = getNeighbors(current);
@@ -217,7 +264,7 @@
                     let key = `${neighbor.r},${neighbor.c}`;
                     if (!visited.has(key)) {
                         visited.add(key);
-                        neighbor.previousNode = current; // Track the path backward
+                        neighbor.previousNode = current; 
                         dataStructure.push(neighbor); 
                     }
                 }
@@ -233,7 +280,6 @@
             toggleButtons(false);
         }
 
-        // Trace backwards from target to start using the previousNode property
         async function tracePath(endNode) {
             let currentNode = endNode.previousNode;
             let pathArray = [];
@@ -243,20 +289,18 @@
                 currentNode = currentNode.previousNode;
             }
             
-            // Reverse so it draws from start to target
             pathArray.reverse();
             
             for (let node of pathArray) {
                 node.element.classList.remove('visited');
                 node.element.classList.add('path');
-                await sleep(25); // Speed of drawing the final line
+                await sleep(25); 
             }
         }
 
         function toggleButtons(disable) {
-            document.getElementById('btn-bfs').disabled = disable;
-            document.getElementById('btn-dfs').disabled = disable;
-            document.getElementById('btn-clear').disabled = disable;
+            const buttons = ['btn-bfs', 'btn-dfs', 'btn-clear-search', 'btn-clear-grid', 'btn-wall', 'btn-eraser'];
+            buttons.forEach(id => document.getElementById(id).disabled = disable);
         }
 
         // Boot it up
